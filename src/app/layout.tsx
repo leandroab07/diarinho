@@ -1,13 +1,33 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider, themeBootScript } from "@/components/theme-provider";
 import { FloralBackdrop } from "@/components/floral-backdrop";
+import { PwaRegister } from "@/components/pwa-register";
+import { InstallHint } from "@/components/install-hint";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Diarinho 🌸 — Diário & Agenda",
   description:
     "Seu cantinho fofo para registrar o dia a dia e organizar compromissos.",
+  applicationName: "Diarinho",
+  appleWebApp: {
+    capable: true,
+    title: "Diarinho",
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
+  manifest: "/manifest.webmanifest",
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ec88a3" },
+    { media: "(prefers-color-scheme: dark)", color: "#15101c" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -32,6 +52,8 @@ export default function RootLayout({
         <ThemeProvider>
           <FloralBackdrop />
           {children}
+          <PwaRegister />
+          <InstallHint />
           <Toaster
             position="top-right"
             richColors
