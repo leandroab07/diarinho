@@ -22,15 +22,19 @@ export default async function AppLayout({
     .single();
 
   const displayName =
-    profile?.display_name ||
-    user.email?.split("@")[0] ||
-    "amigo(a)";
+    profile?.display_name || user.email?.split("@")[0] || "amigo(a)";
 
   return (
     <div className="min-h-screen flex flex-col">
       <TopBar displayName={displayName} />
       <div className="flex-1 md:flex">
-        <Sidebar />
+        <Sidebar
+          profile={{
+            displayName,
+            avatarUrl: profile?.avatar_url ?? null,
+            bio: profile?.bio ?? null,
+          }}
+        />
         <main className="flex-1 p-4 md:p-8">
           <div className="mx-auto max-w-5xl">{children}</div>
         </main>

@@ -24,6 +24,7 @@ type ProfileRow = {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
+  bio: string | null;
   theme: string;
   notify_email: boolean;
   notify_whatsapp: boolean;

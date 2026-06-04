@@ -247,23 +247,23 @@ body {
     var(--bg);
 }
 
-/* Container is non-interactive; only the individual blooms catch the mouse. */
+/* Container is non-interactive; só as flores em si pegam o mouse pro hover. */
 .floral-backdrop .floral-bloom {
   pointer-events: auto;
+  cursor: default; /* mantém o cursor de seta — não parecem botão */
 }
 
 .floral-bloom {
   position: absolute;
-  cursor: pointer;
   background: transparent;
   border: 0;
   padding: 0;
-  opacity: 0.85;
+  opacity: 0.9;
   filter: drop-shadow(0 6px 12px color-mix(in srgb, var(--primary) 45%, transparent));
   transition:
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-    filter 0.35s ease,
-    opacity 0.35s ease;
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.45s ease,
+    opacity 0.45s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -277,7 +277,7 @@ body {
   height: 100%;
   align-items: center;
   justify-content: center;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Continuous ambient animations */
@@ -298,52 +298,18 @@ body {
   animation-delay: inherit;
 }
 
-/* HOVER — wake it up */
+/* HOVER — só elas se mexem, sem virar botão */
 .floral-bloom:hover {
   opacity: 1;
-  transform: scale(1.55) rotate(-8deg);
+  transform: scale(1.35) rotate(-6deg);
   filter:
-    drop-shadow(0 0 18px color-mix(in srgb, var(--primary) 70%, transparent))
-    drop-shadow(0 0 36px color-mix(in srgb, var(--accent) 50%, transparent));
+    drop-shadow(0 0 20px color-mix(in srgb, var(--primary) 65%, transparent))
+    drop-shadow(0 0 36px color-mix(in srgb, var(--accent) 45%, transparent));
   z-index: 20;
 }
 .floral-bloom:hover .floral-bloom-inner {
-  animation: bloom-wiggle 0.6s ease-in-out infinite;
+  animation: bloom-wiggle 0.7s ease-in-out infinite;
 }
-
-/* CLICK — pop! */
-.floral-bloom.is-popping {
-  animation: bloom-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.floral-bloom.is-popping .floral-sparkles span {
-  opacity: 1;
-  animation: sparkle-burst 0.7s ease-out forwards;
-}
-
-/* Sparkles around bloom — show on hover & click */
-.floral-sparkles {
-  position: absolute;
-  inset: -30%;
-  pointer-events: none;
-}
-.floral-sparkles span {
-  position: absolute;
-  font-size: 0.9rem;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-.floral-sparkles span:nth-child(1) { top: 0;    left: 50%; }
-.floral-sparkles span:nth-child(2) { top: 50%;  right: 0;  }
-.floral-sparkles span:nth-child(3) { bottom: 0; left: 50%; }
-.floral-sparkles span:nth-child(4) { top: 50%;  left: 0;   }
-
-.floral-bloom:hover .floral-sparkles span {
-  opacity: 1;
-  animation: sparkle-orbit 1.4s ease-in-out infinite;
-}
-.floral-bloom:hover .floral-sparkles span:nth-child(2) { animation-delay: 0.1s; }
-.floral-bloom:hover .floral-sparkles span:nth-child(3) { animation-delay: 0.2s; }
-.floral-bloom:hover .floral-sparkles span:nth-child(4) { animation-delay: 0.3s; }
 
 .floral-blob {
   position: absolute;
@@ -375,30 +341,8 @@ body {
   75%      { transform: translate(-8px, 6px) rotate(4deg); }
 }
 @keyframes bloom-wiggle {
-  0%, 100% { transform: rotate(-12deg); }
-  50%      { transform: rotate(12deg); }
-}
-@keyframes bloom-pop {
-  0%   { transform: scale(1.55) rotate(-8deg); }
-  35%  { transform: scale(2.0) rotate(20deg); }
-  70%  { transform: scale(1.7) rotate(-15deg); }
-  100% { transform: scale(1.55) rotate(-8deg); }
-}
-@keyframes sparkle-orbit {
-  0%, 100% { transform: scale(0.6) translateY(0); opacity: 0.4; }
-  50%      { transform: scale(1.15) translateY(-6px); opacity: 1; }
-}
-@keyframes sparkle-burst {
-  0%   { transform: scale(0.3) translate(0, 0); opacity: 0; }
-  20%  { opacity: 1; }
-  100% {
-    transform: scale(1.8)
-      translate(
-        calc(var(--bx, 0) * 1px),
-        calc(var(--by, 0) * 1px)
-      );
-    opacity: 0;
-  }
+  0%, 100% { transform: rotate(-10deg); }
+  50%      { transform: rotate(10deg); }
 }
 @keyframes blob-drift {
   0%, 100% { transform: translate(0, 0) scale(1); }
@@ -422,11 +366,11 @@ body {
  * so they don't crowd the small viewport). */
 @media (max-width: 768px) {
   .floral-bloom {
-    transform: scale(0.7);
+    transform: scale(0.65);
     opacity: 0.7;
   }
   .floral-bloom:hover {
-    transform: scale(1.1) rotate(-6deg);
+    transform: scale(1.0) rotate(-4deg);
   }
 }
 
