@@ -239,35 +239,111 @@ body {
 
 [data-theme="pink"] body {
   background:
-    radial-gradient(
-      circle at 12% 10%,
-      color-mix(in srgb, var(--primary) 26%, transparent),
-      transparent 38%
-    ),
-    radial-gradient(
-      circle at 88% 18%,
-      color-mix(in srgb, var(--accent) 24%, transparent),
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at 50% 90%,
-      color-mix(in srgb, var(--peach) 30%, transparent),
-      transparent 45%
-    ),
-    radial-gradient(
-      circle at 80% 70%,
-      color-mix(in srgb, var(--primary) 20%, transparent),
-      transparent 40%
-    ),
+    radial-gradient(circle at 10% 8%, color-mix(in srgb, var(--primary) 28%, transparent), transparent 38%),
+    radial-gradient(circle at 90% 18%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 40%),
+    radial-gradient(circle at 50% 92%, color-mix(in srgb, var(--peach) 34%, transparent), transparent 45%),
+    radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 40%),
+    radial-gradient(circle at 18% 70%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 40%),
     var(--bg);
+}
+
+/* Container is non-interactive; only the individual blooms catch the mouse. */
+.floral-backdrop .floral-bloom {
+  pointer-events: auto;
 }
 
 .floral-bloom {
   position: absolute;
-  opacity: 0.55;
-  filter: drop-shadow(0 4px 10px rgba(236, 136, 163, 0.25));
-  animation: bloom-float 6s ease-in-out infinite;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  opacity: 0.85;
+  filter: drop-shadow(0 6px 12px color-mix(in srgb, var(--primary) 45%, transparent));
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.35s ease,
+    opacity 0.35s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  will-change: transform, filter;
 }
+
+.floral-bloom-inner {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Continuous ambient animations */
+.anim-float .floral-bloom-inner {
+  animation: bloom-float 6s ease-in-out infinite;
+  animation-delay: inherit;
+}
+.anim-sway .floral-bloom-inner {
+  animation: bloom-sway 5s ease-in-out infinite;
+  animation-delay: inherit;
+}
+.anim-spin .floral-bloom-inner {
+  animation: bloom-spin 9s linear infinite;
+  animation-delay: inherit;
+}
+.anim-drift .floral-bloom-inner {
+  animation: bloom-drift 10s ease-in-out infinite;
+  animation-delay: inherit;
+}
+
+/* HOVER — wake it up */
+.floral-bloom:hover {
+  opacity: 1;
+  transform: scale(1.55) rotate(-8deg);
+  filter:
+    drop-shadow(0 0 18px color-mix(in srgb, var(--primary) 70%, transparent))
+    drop-shadow(0 0 36px color-mix(in srgb, var(--accent) 50%, transparent));
+  z-index: 20;
+}
+.floral-bloom:hover .floral-bloom-inner {
+  animation: bloom-wiggle 0.6s ease-in-out infinite;
+}
+
+/* CLICK — pop! */
+.floral-bloom.is-popping {
+  animation: bloom-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.floral-bloom.is-popping .floral-sparkles span {
+  opacity: 1;
+  animation: sparkle-burst 0.7s ease-out forwards;
+}
+
+/* Sparkles around bloom — show on hover & click */
+.floral-sparkles {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+}
+.floral-sparkles span {
+  position: absolute;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.floral-sparkles span:nth-child(1) { top: 0;    left: 50%; }
+.floral-sparkles span:nth-child(2) { top: 50%;  right: 0;  }
+.floral-sparkles span:nth-child(3) { bottom: 0; left: 50%; }
+.floral-sparkles span:nth-child(4) { top: 50%;  left: 0;   }
+
+.floral-bloom:hover .floral-sparkles span {
+  opacity: 1;
+  animation: sparkle-orbit 1.4s ease-in-out infinite;
+}
+.floral-bloom:hover .floral-sparkles span:nth-child(2) { animation-delay: 0.1s; }
+.floral-bloom:hover .floral-sparkles span:nth-child(3) { animation-delay: 0.2s; }
+.floral-bloom:hover .floral-sparkles span:nth-child(4) { animation-delay: 0.3s; }
 
 .floral-blob {
   position: absolute;
@@ -275,31 +351,59 @@ body {
   height: 360px;
   border-radius: 9999px;
   filter: blur(40px);
-  opacity: 0.6;
+  opacity: 0.65;
   animation: blob-drift 14s ease-in-out infinite;
 }
 
+/* Keyframes */
 @keyframes bloom-float {
-  0%,
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50%      { transform: translateY(-14px) rotate(6deg); }
+}
+@keyframes bloom-sway {
+  0%, 100% { transform: rotate(-10deg); }
+  50%      { transform: rotate(10deg); }
+}
+@keyframes bloom-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes bloom-drift {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25%      { transform: translate(8px, -10px) rotate(8deg); }
+  50%      { transform: translate(-6px, -16px) rotate(-6deg); }
+  75%      { transform: translate(-8px, 6px) rotate(4deg); }
+}
+@keyframes bloom-wiggle {
+  0%, 100% { transform: rotate(-12deg); }
+  50%      { transform: rotate(12deg); }
+}
+@keyframes bloom-pop {
+  0%   { transform: scale(1.55) rotate(-8deg); }
+  35%  { transform: scale(2.0) rotate(20deg); }
+  70%  { transform: scale(1.7) rotate(-15deg); }
+  100% { transform: scale(1.55) rotate(-8deg); }
+}
+@keyframes sparkle-orbit {
+  0%, 100% { transform: scale(0.6) translateY(0); opacity: 0.4; }
+  50%      { transform: scale(1.15) translateY(-6px); opacity: 1; }
+}
+@keyframes sparkle-burst {
+  0%   { transform: scale(0.3) translate(0, 0); opacity: 0; }
+  20%  { opacity: 1; }
   100% {
-    transform: translateY(0) rotate(-6deg);
-  }
-  50% {
-    transform: translateY(-14px) rotate(6deg);
+    transform: scale(1.8)
+      translate(
+        calc(var(--bx, 0) * 1px),
+        calc(var(--by, 0) * 1px)
+      );
+    opacity: 0;
   }
 }
-
 @keyframes blob-drift {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(40px, -30px) scale(1.06);
-  }
-  66% {
-    transform: translate(-30px, 40px) scale(0.96);
-  }
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(40px, -30px) scale(1.06); }
+  66%      { transform: translate(-30px, 40px) scale(0.96); }
 }
 
 /* Sticker / decoration dots — used for ornament inside cards on the pink theme */
@@ -312,5 +416,17 @@ body {
   transform: rotate(15deg);
   opacity: 0.85;
   pointer-events: none;
+}
+
+/* Mobile: chill — fewer blooms feel-wise (still visible, just smaller & dimmer
+ * so they don't crowd the small viewport). */
+@media (max-width: 768px) {
+  .floral-bloom {
+    transform: scale(0.7);
+    opacity: 0.7;
+  }
+  .floral-bloom:hover {
+    transform: scale(1.1) rotate(-6deg);
+  }
 }
 
