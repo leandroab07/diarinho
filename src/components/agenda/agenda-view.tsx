@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Tabs,
   TabsContent,
@@ -8,9 +8,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EventCard } from "@/components/agenda/event-card";
 import { EventForm } from "@/components/agenda/event-form";
 import { MonthCalendar } from "@/components/agenda/month-calendar";
+import { UpcomingTimeline } from "@/components/agenda/upcoming-timeline";
+import { PastList } from "@/components/agenda/past-list";
 import {
   isPast,
   isUpcoming,
@@ -20,13 +21,27 @@ import {
 import { CalendarHeart, History, Sparkles, ListTodo } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { EventCard } from "@/components/agenda/event-card";
 
 type EnrichedEvent = EventRow & { event_reminders: ReminderRow[] };
 
-export function AgendaView({ events }: { events: EnrichedEvent[] }) {
+export function AgendaView({
+  events,
+  nowIso,
+}: {
+  events: EnrichedEvent[];
+  nowIso: string;
+}) {
+  // Initialise `now` from the server-provided ISO string so client + server
+  // hydrate from the same value, then refresh every minute on the client.
+  const [now, setNow] = useState(() => new Date(nowIso));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
-  const now = useMemo(() => new Date(), []);
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const upcoming = useMemo(
     () => events.filter((ev) => isUpcoming(ev, now)),
     [events, now],
@@ -35,7 +50,6 @@ export function AgendaView({ events }: { events: EnrichedEvent[] }) {
     () => events.filter((ev) => isPast(ev, now)),
     [events, now],
   );
-
   const dayEvents = useMemo(() => {
     if (!selectedDay) return [];
     return events.filter((ev) => isSameDay(new Date(ev.starts_at), selectedDay));
@@ -45,45 +59,50 @@ export function AgendaView({ events }: { events: EnrichedEvent[] }) {
     <Tabs defaultValue="upcoming" className="w-full">
       <TabsList className="grid grid-cols-3 w-full max-w-md mb-4">
         <TabsTrigger value="upcoming">
-          <Sparkles className="h-4 w-4 mr-1" /> Próximos
+          <Sparkles className="h-4 w-4 mr-1" />
+          <span className="hidden sm:inline">Próximos</span>
+          <span className="sm:hidden">Próx.</span>
         </TabsTrigger>
         <TabsTrigger value="calendar">
-          <CalendarHeart className="h-4 w-4 mr-1" /> Mês
+          <CalendarHeart className="h-4 w-4 mr-1" />
+          Mês
         </TabsTrigger>
         <TabsTrigger value="history">
-          <History className="h-4 w-4 mr-1" /> Histórico
+          <History className="h-4 w-4 mr-1" />
+          <span className="hidden sm:inline">Histórico</span>
+          <span className="sm:hidden">Hist.</span>
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="upcoming">
         {upcoming.length === 0 ? (
-          <Empty title="Nada por vir 🌸" description="Agenda livre, aproveita o vento." />
+          <Empty
+            title="Nada por vir 🌷"
+            description="Agenda livre — aproveita o ventinho na cara."
+          />
         ) : (
-          <div className="grid gap-3">
-            {upcoming.map((ev) => (
-              <EventCard
-                key={ev.id}
-                event={ev}
-                reminders={ev.event_reminders ?? []}
-              />
-            ))}
-          </div>
+          <UpcomingTimeline events={upcoming} nowIso={now.toISOString()} />
         )}
       </TabsContent>
 
       <TabsContent value="calendar" className="space-y-4">
-        <MonthCalendar events={events} onSelect={(d) => setSelectedDay(d)} />
+        <MonthCalendar
+          events={events}
+          nowIso={now.toISOString()}
+          selectedDay={selectedDay}
+          onSelect={(d) => setSelectedDay(d)}
+        />
         {selectedDay && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span>
+              <CardTitle className="text-lg flex items-center justify-between flex-wrap gap-2">
+                <span className="capitalize">
                   {format(selectedDay, "EEEE, d 'de' MMMM", { locale: ptBR })}
                 </span>
                 <EventForm
                   initialDate={selectedDay}
                   triggerLabel="Adicionar"
-                  triggerVariant="ghost"
+                  triggerVariant="soft"
                   triggerSize="sm"
                 />
               </CardTitle>
@@ -91,7 +110,7 @@ export function AgendaView({ events }: { events: EnrichedEvent[] }) {
             <CardContent className="space-y-3">
               {dayEvents.length === 0 ? (
                 <p className="text-sm text-[var(--muted-fg)] py-3 text-center">
-                  Nadinha agendado nesse dia 🌷
+                  Sem nada nesse dia 🌷
                 </p>
               ) : (
                 dayEvents.map((ev) => (
@@ -109,24 +128,25 @@ export function AgendaView({ events }: { events: EnrichedEvent[] }) {
 
       <TabsContent value="history">
         {past.length === 0 ? (
-          <Empty title="Sem histórico ainda" description="O que passou aparece aqui." />
+          <Empty
+            title="Sem histórico ainda"
+            description="O que passou aparece aqui depois."
+          />
         ) : (
-          <div className="grid gap-3">
-            {past.map((ev) => (
-              <EventCard
-                key={ev.id}
-                event={ev}
-                reminders={ev.event_reminders ?? []}
-              />
-            ))}
-          </div>
+          <PastList events={past} />
         )}
       </TabsContent>
     </Tabs>
   );
 }
 
-function Empty({ title, description }: { title: string; description: string }) {
+function Empty({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <Card>
       <CardHeader className="text-center py-12">

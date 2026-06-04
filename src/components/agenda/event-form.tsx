@@ -77,7 +77,7 @@ export function EventForm({
   reminders?: Reminder[];
   initialDate?: Date;
   triggerLabel?: string;
-  triggerVariant?: "default" | "outline" | "ghost";
+  triggerVariant?: "default" | "outline" | "ghost" | "soft" | "accent";
   triggerSize?: "default" | "sm";
 }) {
   const router = useRouter();
