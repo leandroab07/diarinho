@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Pencil,
+  Gamepad2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/", label: "Início", icon: Home, emoji: "🏡" },
   { href: "/diario", label: "Diário", icon: BookHeart, emoji: "📖" },
   { href: "/agenda", label: "Agenda", icon: CalendarHeart, emoji: "📅" },
+  { href: "/maquina-de-ursinhos", label: "Joguinho", icon: Gamepad2, emoji: "🧸" },
   { href: "/configuracoes", label: "Ajustes", icon: Settings, emoji: "⚙️" },
 ];
 
