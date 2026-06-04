@@ -14,12 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { MoodPicker } from "@/components/diary/mood-picker";
+import { PaperPicker } from "@/components/diary/paper-picker";
+import { PaperTextarea } from "@/components/diary/paper-textarea";
 import { PenLine, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { saveEntry } from "@/app/(app)/diario/actions";
-import type { Database, Mood } from "@/lib/database.types";
+import type { Database, Mood, PaperStyle } from "@/lib/database.types";
 
 type Entry = Database["public"]["Tables"]["diary_entries"]["Row"];
 
@@ -101,14 +102,23 @@ export function EntryEditor({
           </div>
 
           <div className="space-y-2">
+            <Label>Estilo do papel</Label>
+            <PaperPicker
+              defaultValue={(entry?.paper_style ?? "plain") as PaperStyle}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="content">O que rolou hoje?</Label>
-            <Textarea
+            <PaperTextarea
               id="content"
               name="content"
               placeholder="Comecei o dia tomando um café gostoso enquanto..."
               defaultValue={entry?.content ?? ""}
               required
-              className="min-h-[220px]"
+              defaultPaperStyle={
+                (entry?.paper_style ?? "plain") as PaperStyle
+              }
             />
           </div>
 
@@ -120,6 +130,9 @@ export function EntryEditor({
               placeholder="trabalho, amigos, café"
               defaultValue={entry?.tags?.join(", ") ?? ""}
             />
+            <p className="text-[10px] text-[var(--muted-fg)]">
+              elas aparecem como #chips embaixo da publicação 🎀
+            </p>
           </div>
 
           <DialogFooter>

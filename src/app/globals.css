@@ -228,6 +228,135 @@ body {
 }
 
 /* ============================================================
+ * Paper styles para o diário
+ * ============================================================ */
+.paper-plain {
+  background: #fffdf9;
+  color: #4a2c3d;
+}
+
+.paper-lined {
+  background-color: #fffdf9;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 27px,
+    rgba(150, 110, 130, 0.35) 27px,
+    rgba(150, 110, 130, 0.35) 28px,
+    transparent 28px
+  );
+  background-size: 100% 28px;
+  background-position: 0 0;
+  color: #4a2c3d;
+}
+
+.paper-grid {
+  background-color: #fffdf9;
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent 23px,
+      rgba(180, 140, 160, 0.3) 23px,
+      rgba(180, 140, 160, 0.3) 24px,
+      transparent 24px
+    ),
+    linear-gradient(
+      to right,
+      transparent 23px,
+      rgba(180, 140, 160, 0.3) 23px,
+      rgba(180, 140, 160, 0.3) 24px,
+      transparent 24px
+    );
+  background-size: 24px 24px;
+  color: #4a2c3d;
+}
+
+.paper-dotted {
+  background-color: #fffdf9;
+  background-image: radial-gradient(
+    circle,
+    rgba(180, 140, 160, 0.45) 1.5px,
+    transparent 1.5px
+  );
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+  color: #4a2c3d;
+}
+
+.paper-margin {
+  background-color: #fffdf9;
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent 27px,
+      rgba(150, 110, 130, 0.3) 27px,
+      rgba(150, 110, 130, 0.3) 28px,
+      transparent 28px
+    ),
+    linear-gradient(
+      to right,
+      transparent 56px,
+      rgba(236, 88, 132, 0.55) 56px,
+      rgba(236, 88, 132, 0.55) 58px,
+      transparent 58px
+    );
+  background-size: 100% 28px, 100% 100%;
+  padding-left: 76px !important;
+  color: #4a2c3d;
+}
+
+.paper-parchment {
+  background:
+    radial-gradient(
+      ellipse at top left,
+      rgba(180, 130, 80, 0.18),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at bottom right,
+      rgba(180, 130, 80, 0.22),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at top right,
+      rgba(140, 100, 60, 0.12),
+      transparent 50%
+    ),
+    #f7ecd2;
+  color: #5a3a1a;
+  border-color: #d4b88a !important;
+  box-shadow: inset 0 0 30px rgba(180, 130, 80, 0.15);
+}
+
+/* Preview no PaperPicker — escala as linhas pra ficarem visíveis em mini */
+.paper-preview.paper-lined {
+  background-size: 100% 8px;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 7px,
+    rgba(150, 110, 130, 0.5) 7px,
+    rgba(150, 110, 130, 0.5) 8px,
+    transparent 8px
+  );
+}
+.paper-preview.paper-grid {
+  background-size: 8px 8px;
+  background-image:
+    linear-gradient(to bottom, transparent 7px, rgba(180,140,160,0.5) 7px, rgba(180,140,160,0.5) 8px, transparent 8px),
+    linear-gradient(to right, transparent 7px, rgba(180,140,160,0.5) 7px, rgba(180,140,160,0.5) 8px, transparent 8px);
+}
+.paper-preview.paper-dotted {
+  background-size: 7px 7px;
+  background-position: 3px 3px;
+}
+.paper-preview.paper-margin {
+  background-size: 100% 8px, 100% 100%;
+  background-image:
+    linear-gradient(to bottom, transparent 7px, rgba(150,110,130,0.5) 7px, rgba(150,110,130,0.5) 8px, transparent 8px),
+    linear-gradient(to right, transparent 16px, rgba(236,88,132,0.7) 16px, rgba(236,88,132,0.7) 17px, transparent 17px);
+  padding: 0 !important;
+}
+
+/* ============================================================
  * Floral backdrop — só aparece no tema rosa (default)
  * ============================================================ */
 .floral-backdrop {
@@ -247,10 +376,11 @@ body {
     var(--bg);
 }
 
-/* Container is non-interactive; só as flores em si pegam o mouse pro hover. */
-.floral-backdrop .floral-bloom {
+/* As ornaments de borda continuam não-clicáveis e só animam no hover.
+ * Os ursinhos do "campo" (FieldFriend) têm próprios handlers em JS. */
+.floral-edges .floral-bloom {
   pointer-events: auto;
-  cursor: default; /* mantém o cursor de seta — não parecem botão */
+  cursor: default;
 }
 
 .floral-bloom {
@@ -362,16 +492,7 @@ body {
   pointer-events: none;
 }
 
-/* Figuras laterais só aparecem quando sobra espaço além do conteúdo
- * (sidebar 288 + main max-w-5xl 1024 + paddings 64 ≈ 1376; folga > 1440). */
-.floral-side { display: none; }
-
-@media (min-width: 1440px) {
-  .floral-side { display: inline-flex; }
-}
-
-/* Figuras de borda (topo/rodapé) ficam menores e mais discretas em mobile
- * pra não competir com o conteúdo. */
+/* Edges (mini emojis no topo/rodapé) ficam menores em mobile */
 @media (max-width: 768px) {
   .floral-edge {
     transform: scale(0.75);
@@ -380,6 +501,36 @@ body {
   .floral-edge:hover {
     transform: scale(1.0) rotate(-4deg);
   }
+  .field-friend {
+    display: none; /* em telas pequenas, sem ursinhos arrastáveis */
+  }
+}
+
+/* Field creatures (ursinhos arrastáveis) */
+.field-friend {
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: auto;
+}
+.field-friend.is-dragging {
+  cursor: grabbing !important;
+}
+.field-friend::after {
+  content: "";
+  position: absolute;
+  inset: -8%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--primary) 12%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+.field-friend:hover::after {
+  opacity: 1;
 }
 
 /* ============================================================

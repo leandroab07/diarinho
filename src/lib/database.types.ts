@@ -12,6 +12,14 @@ export type Mood =
   | "grato"
   | "animado";
 
+export type PaperStyle =
+  | "plain"
+  | "lined"
+  | "grid"
+  | "dotted"
+  | "margin"
+  | "parchment";
+
 export type Json =
   | string
   | number
@@ -43,6 +51,7 @@ type DiaryRow = {
   content: string;
   mood: Mood | null;
   tags: string[];
+  paper_style: PaperStyle;
   created_at: string;
   updated_at: string;
 };

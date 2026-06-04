@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { Mood } from "@/lib/database.types";
+import type { Mood, PaperStyle } from "@/lib/database.types";
 
 const ALLOWED_MOODS: Mood[] = [
   "feliz",
@@ -15,17 +15,32 @@ const ALLOWED_MOODS: Mood[] = [
   "animado",
 ];
 
+const ALLOWED_PAPERS: PaperStyle[] = [
+  "plain",
+  "lined",
+  "grid",
+  "dotted",
+  "margin",
+  "parchment",
+];
+
 function parseMood(v: FormDataEntryValue | null): Mood | null {
   if (!v) return null;
   const s = String(v);
   return (ALLOWED_MOODS as string[]).includes(s) ? (s as Mood) : null;
 }
 
+function parsePaper(v: FormDataEntryValue | null): PaperStyle {
+  if (!v) return "plain";
+  const s = String(v);
+  return (ALLOWED_PAPERS as string[]).includes(s) ? (s as PaperStyle) : "plain";
+}
+
 function parseTags(v: FormDataEntryValue | null): string[] {
   if (!v) return [];
   return String(v)
     .split(",")
-    .map((t) => t.trim())
+    .map((t) => t.trim().replace(/^#/, ""))
     .filter(Boolean)
     .slice(0, 12);
 }
@@ -43,11 +58,12 @@ export async function saveEntry(formData: FormData) {
   const content = String(formData.get("content") ?? "");
   const mood = parseMood(formData.get("mood"));
   const tags = parseTags(formData.get("tags"));
+  const paper_style = parsePaper(formData.get("paper_style"));
 
   if (id) {
     await supabase
       .from("diary_entries")
-      .update({ entry_date, title, content, mood, tags })
+      .update({ entry_date, title, content, mood, tags, paper_style })
       .eq("id", String(id));
   } else {
     await supabase.from("diary_entries").insert({
@@ -57,6 +73,7 @@ export async function saveEntry(formData: FormData) {
       content,
       mood,
       tags,
+      paper_style,
     });
   }
 
