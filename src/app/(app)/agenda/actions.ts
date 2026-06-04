@@ -29,6 +29,8 @@ export type EventPayload = {
   reminders: ReminderInput[];
 };
 
+export type ActionResult = { ok: true } | { ok: false; error: string };
+
 function sanitizeReminders(input: ReminderInput[]): ReminderInput[] {
   return input
     .filter((r) => UNITS.includes(r.unit))
@@ -43,77 +45,155 @@ function sanitizeReminders(input: ReminderInput[]): ReminderInput[] {
     .filter((r) => r.channels.length > 0);
 }
 
-export async function saveEvent(payload: EventPayload) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("não autenticado");
+export async function saveEvent(payload: EventPayload): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "não autenticado" };
 
-  const reminders = sanitizeReminders(payload.reminders);
-
-  if (payload.id) {
-    await supabase
-      .from("events")
-      .update({
-        title: payload.title,
-        description: payload.description ?? null,
-        location: payload.location ?? null,
-        color: payload.color,
-        starts_at: payload.starts_at,
-        ends_at: payload.ends_at ?? null,
-        all_day: payload.all_day,
-      })
-      .eq("id", payload.id);
-
-    await supabase.from("event_reminders").delete().eq("event_id", payload.id);
-    if (reminders.length) {
-      await supabase.from("event_reminders").insert(
-        reminders.map((r) => ({
-          event_id: payload.id!,
-          user_id: user.id,
-          unit: r.unit,
-          value: r.value,
-          channels: r.channels,
-        })),
-      );
+    if (!payload.title?.trim()) {
+      return { ok: false, error: "título é obrigatório" };
     }
-  } else {
-    const { data: created } = await supabase
-      .from("events")
-      .insert({
-        user_id: user.id,
-        title: payload.title,
-        description: payload.description ?? null,
-        location: payload.location ?? null,
-        color: payload.color,
-        starts_at: payload.starts_at,
-        ends_at: payload.ends_at ?? null,
-        all_day: payload.all_day,
-      })
-      .select("id")
-      .single();
 
-    if (created && reminders.length) {
-      await supabase.from("event_reminders").insert(
-        reminders.map((r) => ({
-          event_id: created.id,
+    const reminders = sanitizeReminders(payload.reminders);
+
+    if (payload.id) {
+      const { error: updErr } = await supabase
+        .from("events")
+        .update({
+          title: payload.title,
+          description: payload.description ?? null,
+          location: payload.location ?? null,
+          color: payload.color,
+          starts_at: payload.starts_at,
+          ends_at: payload.ends_at ?? null,
+          all_day: payload.all_day,
+        })
+        .eq("id", payload.id);
+      if (updErr) return { ok: false, error: updErr.message };
+
+      const { error: delErr } = await supabase
+        .from("event_reminders")
+        .delete()
+        .eq("event_id", payload.id);
+      if (delErr) return { ok: false, error: delErr.message };
+
+      if (reminders.length) {
+        const { error: insErr } = await supabase
+          .from("event_reminders")
+          .insert(
+            reminders.map((r) => ({
+              event_id: payload.id!,
+              user_id: user.id,
+              unit: r.unit,
+              value: r.value,
+              channels: r.channels,
+            })),
+          );
+        if (insErr) return { ok: false, error: insErr.message };
+      }
+    } else {
+      const { data: created, error: insErr } = await supabase
+        .from("events")
+        .insert({
           user_id: user.id,
-          unit: r.unit,
-          value: r.value,
-          channels: r.channels,
-        })),
-      );
+          title: payload.title,
+          description: payload.description ?? null,
+          location: payload.location ?? null,
+          color: payload.color,
+          starts_at: payload.starts_at,
+          ends_at: payload.ends_at ?? null,
+          all_day: payload.all_day,
+        })
+        .select("id")
+        .single();
+
+      if (insErr || !created) {
+        return { ok: false, error: insErr?.message ?? "falha ao criar evento" };
+      }
+
+      if (reminders.length) {
+        const { error: rInsErr } = await supabase
+          .from("event_reminders")
+          .insert(
+            reminders.map((r) => ({
+              event_id: created.id,
+              user_id: user.id,
+              unit: r.unit,
+              value: r.value,
+              channels: r.channels,
+            })),
+          );
+        if (rInsErr) return { ok: false, error: rInsErr.message };
+      }
     }
+
+    revalidatePath("/agenda");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "erro inesperado",
+    };
   }
-
-  revalidatePath("/agenda");
-  revalidatePath("/");
 }
 
-export async function deleteEvent(id: string) {
-  const supabase = await createClient();
-  await supabase.from("events").delete().eq("id", id);
-  revalidatePath("/agenda");
-  revalidatePath("/");
+export async function deleteEvent(id: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from("events").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/agenda");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "erro inesperado",
+    };
+  }
+}
+
+export async function dismissReminder(id: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("event_reminders")
+      .update({ dismissed_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/agenda");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "erro inesperado",
+    };
+  }
+}
+
+export async function snoozeReminder(
+  id: string,
+  minutes: number,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const until = new Date(Date.now() + minutes * 60_000).toISOString();
+    const { error } = await supabase
+      .from("event_reminders")
+      .update({ dismissed_at: until })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/agenda");
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "erro inesperado",
+    };
+  }
 }

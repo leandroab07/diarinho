@@ -32,7 +32,11 @@ export function EventCard({
 
   async function handleDelete() {
     if (!confirm("Apagar esse compromisso?")) return;
-    await deleteEvent(event.id);
+    const result = await deleteEvent(event.id);
+    if (!result.ok) {
+      toast.error("Não consegui apagar 🥺", { description: result.error });
+      return;
+    }
     toast.success("Compromisso apagado");
     router.refresh();
   }

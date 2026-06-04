@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/sidebar";
-import { ReminderEngine } from "@/components/reminder-engine";
+import { TopBar } from "@/components/topbar";
+import { ActiveReminders } from "@/components/active-reminders";
 
 export default async function AppLayout({
   children,
@@ -26,12 +27,15 @@ export default async function AppLayout({
     "amigo(a)";
 
   return (
-    <div className="min-h-screen md:flex">
-      <Sidebar displayName={displayName} />
-      <main className="flex-1 p-4 md:p-8 md:pl-0">
-        <div className="mx-auto max-w-5xl">{children}</div>
-      </main>
-      <ReminderEngine notifySoundDefault={profile?.notify_sound ?? true} />
+    <div className="min-h-screen flex flex-col">
+      <TopBar displayName={displayName} />
+      <div className="flex-1 md:flex">
+        <Sidebar />
+        <main className="flex-1 p-4 md:p-8">
+          <div className="mx-auto max-w-5xl">{children}</div>
+        </main>
+      </div>
+      <ActiveReminders notifySoundDefault={profile?.notify_sound ?? true} />
     </div>
   );
 }

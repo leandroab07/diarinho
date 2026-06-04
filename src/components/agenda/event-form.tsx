@@ -162,28 +162,26 @@ export function EventForm({
     }
 
     setPending(true);
-    try {
-      await saveEvent({
-        id: event?.id,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        location: location.trim() || undefined,
-        color,
-        starts_at,
-        ends_at,
-        all_day: allDay,
-        reminders,
-      });
-      toast.success(event ? "Evento atualizado ✨" : "Evento criado 🎀");
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      toast.error("Ops 🥺", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setPending(false);
+    const result = await saveEvent({
+      id: event?.id,
+      title: title.trim(),
+      description: description.trim() || undefined,
+      location: location.trim() || undefined,
+      color,
+      starts_at,
+      ends_at,
+      all_day: allDay,
+      reminders,
+    });
+    setPending(false);
+
+    if (!result.ok) {
+      toast.error("Não consegui salvar 🥺", { description: result.error });
+      return;
     }
+    toast.success(event ? "Evento atualizado ✨" : "Evento criado 🎀");
+    setOpen(false);
+    router.refresh();
   }
 
   return (

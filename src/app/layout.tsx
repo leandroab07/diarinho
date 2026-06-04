@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider, themeBootScript } from "@/components/theme-provider";
+import { FloralBackdrop } from "@/components/floral-backdrop";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -27,8 +28,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased gradient-bg-pink min-h-screen">
+      <body className="antialiased min-h-screen relative">
         <ThemeProvider>
+          <FloralBackdrop />
           {children}
           <Toaster
             position="top-right"
