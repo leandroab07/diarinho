@@ -127,11 +127,11 @@ function ProfileCard({
   initial: string;
 }) {
   return (
-    <div className="relative rounded-3xl border-2 border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)] overflow-hidden">
-      {/* decorative blob */}
+    <div className="relative rounded-3xl border-2 border-[var(--border)] bg-[var(--card)] p-5 pt-6 shadow-[var(--shadow-soft)] overflow-hidden">
+      {/* decorative blobs */}
       <span
         aria-hidden
-        className="absolute -top-8 -right-8 h-24 w-24 rounded-full"
+        className="absolute -top-10 -right-10 h-32 w-32 rounded-full"
         style={{
           background:
             "radial-gradient(circle, color-mix(in srgb, var(--primary) 35%, transparent), transparent 70%)",
@@ -139,7 +139,7 @@ function ProfileCard({
       />
       <span
         aria-hidden
-        className="absolute -bottom-10 -left-6 h-20 w-20 rounded-full"
+        className="absolute -bottom-12 -left-8 h-28 w-28 rounded-full"
         style={{
           background:
             "radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%)",
@@ -149,40 +149,86 @@ function ProfileCard({
       <div className="relative flex flex-col items-center text-center">
         <Link
           href="/configuracoes"
-          className="group relative"
+          className="group relative inline-block"
           aria-label="Editar perfil"
         >
-          <div className="h-20 w-20 rounded-full border-4 border-[var(--primary)] overflow-hidden bg-[var(--muted)] shadow-[var(--shadow-soft)] flex items-center justify-center transition-transform group-hover:scale-105">
-            {profile.avatarUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={profile.avatarUrl}
-                alt={profile.displayName}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="font-handwriting text-4xl text-[var(--primary)]">
-                {initial}
-              </span>
-            )}
+          {/* Corner decorations */}
+          <span
+            aria-hidden
+            className="absolute -top-2 left-1/2 -translate-x-1/2 text-2xl animate-float select-none z-10"
+            style={{ animationDelay: "0s" }}
+          >
+            🎀
+          </span>
+          <span
+            aria-hidden
+            className="absolute top-2 -left-3 text-lg rotate-[-18deg] animate-float select-none"
+            style={{ animationDelay: "0.4s" }}
+          >
+            🌸
+          </span>
+          <span
+            aria-hidden
+            className="absolute top-2 -right-3 text-lg rotate-[18deg] animate-float select-none"
+            style={{ animationDelay: "0.8s" }}
+          >
+            🌸
+          </span>
+          <span
+            aria-hidden
+            className="absolute -bottom-2 -left-2 text-base animate-float select-none"
+            style={{ animationDelay: "1.2s" }}
+          >
+            💐
+          </span>
+          <span
+            aria-hidden
+            className="absolute -bottom-2 -right-2 text-base animate-float select-none"
+            style={{ animationDelay: "1.6s" }}
+          >
+            💐
+          </span>
+
+          {/* Outer rotating gradient frame */}
+          <div className="avatar-frame h-36 w-36 md:h-40 md:w-40 rounded-full p-[4px] shadow-[var(--shadow-soft)] transition-transform group-hover:scale-105">
+            {/* White inner ring */}
+            <div className="h-full w-full rounded-full bg-[var(--card)] p-[5px]">
+              {/* Photo */}
+              <div className="h-full w-full rounded-full overflow-hidden bg-[var(--muted)] flex items-center justify-center">
+                {profile.avatarUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={profile.avatarUrl}
+                    alt={profile.displayName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="font-handwriting text-7xl md:text-8xl text-[var(--primary)] leading-none">
+                    {initial}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <span className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-[var(--accent)] text-[var(--accent-fg)] flex items-center justify-center shadow-[var(--shadow-soft)] opacity-0 group-hover:opacity-100 transition-opacity">
-            <Pencil className="h-3.5 w-3.5" />
+
+          {/* Edit pencil on hover */}
+          <span className="absolute bottom-1 right-1 h-9 w-9 rounded-full bg-[var(--accent)] text-[var(--accent-fg)] flex items-center justify-center shadow-[var(--shadow-soft)] opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100 z-10">
+            <Pencil className="h-4 w-4" />
           </span>
         </Link>
 
-        <p className="mt-3 font-bold text-base leading-tight truncate w-full">
+        <p className="mt-5 font-bold text-lg leading-tight truncate w-full px-1">
           {profile.displayName}
         </p>
 
         {profile.bio ? (
-          <p className="mt-1.5 text-[13px] font-handwriting text-[var(--muted-fg)] leading-snug px-1 line-clamp-3">
+          <p className="mt-2 font-handwriting text-xl md:text-2xl text-[var(--card-fg)]/85 leading-snug px-1 line-clamp-4">
             “{profile.bio}”
           </p>
         ) : (
           <Link
             href="/configuracoes"
-            className="mt-1.5 text-xs text-[var(--primary)] font-semibold hover:underline"
+            className="mt-2 text-sm text-[var(--primary)] font-semibold hover:underline"
           >
             + adicionar uma bio
           </Link>

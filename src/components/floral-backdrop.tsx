@@ -311,40 +311,41 @@ type Decoration = {
   size: string;
   delay: number;
   anim?: "float" | "sway" | "spin" | "drift";
+  /** 'side' = só em telas largas (>=1400px), 'edge' = sempre */
+  zone: "side" | "edge";
 };
 
-// Margins only — never over the central content area.
+// SIDE: aparecem só em telas largas (>=1400px) onde sobra espaço além da sidebar+conteúdo.
 const LEFT_SIDE: Decoration[] = [
-  { kind: "bear-pink",   style: { top: "4%",  left: "1%"   }, size: "92px", delay: 0.0, anim: "float" },
-  { kind: "kawaii-daisy",style: { top: "14%", left: "2.5%" }, size: "80px", delay: 0.5, anim: "sway" },
-  { kind: "bunny-white", style: { top: "24%", left: "1%"   }, size: "84px", delay: 1.0, anim: "float" },
-  { kind: "🌷",          style: { top: "36%", left: "3%"   }, size: "2.4rem", delay: 1.5, anim: "sway" },
-  { kind: "bear-mint",   style: { top: "45%", left: "1%"   }, size: "88px", delay: 0.3, anim: "float" },
-  { kind: "kawaii-tulip",style: { top: "57%", left: "2.5%" }, size: "82px", delay: 1.1, anim: "sway" },
-  { kind: "bunny-cream", style: { top: "70%", left: "1%"   }, size: "84px", delay: 0.7, anim: "float" },
-  { kind: "kawaii-cloud",style: { top: "82%", left: "3%"   }, size: "76px", delay: 1.4, anim: "drift" },
-  { kind: "bear-yellow", style: { top: "92%", left: "1%"   }, size: "82px", delay: 0.6, anim: "float" },
+  { zone: "side", kind: "bear-pink",   style: { top: "5%",  left: "0.5%" }, size: "92px", delay: 0.0, anim: "float" },
+  { zone: "side", kind: "kawaii-daisy",style: { top: "16%", left: "1.5%" }, size: "80px", delay: 0.5, anim: "sway" },
+  { zone: "side", kind: "bunny-white", style: { top: "28%", left: "0.5%" }, size: "84px", delay: 1.0, anim: "float" },
+  { zone: "side", kind: "bear-mint",   style: { top: "42%", left: "1%"   }, size: "88px", delay: 0.3, anim: "float" },
+  { zone: "side", kind: "kawaii-tulip",style: { top: "55%", left: "1.5%" }, size: "82px", delay: 1.1, anim: "sway" },
+  { zone: "side", kind: "bunny-cream", style: { top: "68%", left: "0.5%" }, size: "84px", delay: 0.7, anim: "float" },
+  { zone: "side", kind: "kawaii-cloud",style: { top: "80%", left: "1.5%" }, size: "76px", delay: 1.4, anim: "drift" },
+  { zone: "side", kind: "bear-yellow", style: { top: "92%", left: "0.5%" }, size: "82px", delay: 0.6, anim: "float" },
 ];
 
 const RIGHT_SIDE: Decoration[] = [
-  { kind: "kawaii-cherry",style: { top: "5%",  right: "1%"   }, size: "82px", delay: 0.2, anim: "float" },
-  { kind: "bear-lilac",   style: { top: "16%", right: "2%"   }, size: "90px", delay: 0.7, anim: "float" },
-  { kind: "🌸",           style: { top: "27%", right: "3%"   }, size: "2.6rem", delay: 1.2, anim: "float" },
-  { kind: "bunny-lilac",  style: { top: "37%", right: "1%"   }, size: "86px", delay: 1.5, anim: "float" },
-  { kind: "kawaii-daisy", style: { top: "50%", right: "2.5%" }, size: "78px", delay: 0.4, anim: "sway" },
-  { kind: "bear-pink",    style: { top: "62%", right: "1%"   }, size: "88px", delay: 0.9, anim: "float" },
-  { kind: "kawaii-tulip", style: { top: "75%", right: "2.5%" }, size: "80px", delay: 1.4, anim: "sway" },
-  { kind: "bunny-white",  style: { top: "86%", right: "1%"   }, size: "84px", delay: 1.7, anim: "float" },
-  { kind: "🌻",           style: { top: "95%", right: "2.5%" }, size: "2.2rem", delay: 0.4, anim: "sway" },
+  { zone: "side", kind: "kawaii-cherry",style: { top: "5%",  right: "0.5%" }, size: "82px", delay: 0.2, anim: "float" },
+  { zone: "side", kind: "bear-lilac",   style: { top: "17%", right: "1%"   }, size: "90px", delay: 0.7, anim: "float" },
+  { zone: "side", kind: "bunny-lilac",  style: { top: "30%", right: "1.5%" }, size: "86px", delay: 1.5, anim: "float" },
+  { zone: "side", kind: "kawaii-daisy", style: { top: "43%", right: "0.5%" }, size: "78px", delay: 0.4, anim: "sway" },
+  { zone: "side", kind: "bear-pink",    style: { top: "56%", right: "1%"   }, size: "88px", delay: 0.9, anim: "float" },
+  { zone: "side", kind: "kawaii-tulip", style: { top: "69%", right: "1.5%" }, size: "80px", delay: 1.4, anim: "sway" },
+  { zone: "side", kind: "bunny-white",  style: { top: "82%", right: "0.5%" }, size: "84px", delay: 1.7, anim: "float" },
+  { zone: "side", kind: "kawaii-cherry",style: { top: "94%", right: "1%"   }, size: "78px", delay: 0.4, anim: "float" },
 ];
 
+// EDGE: aparecem sempre — só nos cantos superior/inferior (fora do fluxo de leitura).
 const EDGES: Decoration[] = [
-  { kind: "✨",     style: { top: "3%",  left: "30%" }, size: "1.4rem", delay: 0.6, anim: "spin" },
-  { kind: "💕",     style: { top: "2%",  left: "62%" }, size: "1.5rem", delay: 1.1, anim: "float" },
-  { kind: "⭐",     style: { top: "4%",  left: "78%" }, size: "1.3rem", delay: 1.6, anim: "spin" },
-  { kind: "🌸",     style: { bottom: "2%", left: "22%" }, size: "1.6rem", delay: 0.4, anim: "float" },
-  { kind: "🦋",     style: { bottom: "3%", left: "50%" }, size: "1.7rem", delay: 0.9, anim: "drift" },
-  { kind: "✨",     style: { bottom: "2%", left: "72%" }, size: "1.3rem", delay: 1.4, anim: "spin" },
+  { zone: "edge", kind: "✨",     style: { top: "1%",  left: "30%" }, size: "1.3rem", delay: 0.6, anim: "spin" },
+  { zone: "edge", kind: "💕",     style: { top: "0.8%",left: "62%" }, size: "1.4rem", delay: 1.1, anim: "float" },
+  { zone: "edge", kind: "⭐",     style: { top: "1.2%",left: "78%" }, size: "1.2rem", delay: 1.6, anim: "spin" },
+  { zone: "edge", kind: "🌸",     style: { bottom: "1%", left: "22%" }, size: "1.5rem", delay: 0.4, anim: "float" },
+  { zone: "edge", kind: "🦋",     style: { bottom: "1.5%", left: "50%" }, size: "1.6rem", delay: 0.9, anim: "drift" },
+  { zone: "edge", kind: "✨",     style: { bottom: "1%", left: "72%" }, size: "1.2rem", delay: 1.4, anim: "spin" },
 ];
 
 const ALL_DECORATIONS = [...LEFT_SIDE, ...RIGHT_SIDE, ...EDGES];
@@ -368,7 +369,7 @@ export function FloralBackdrop() {
       {ALL_DECORATIONS.map((deco, idx) => (
         <span
           key={idx}
-          className={`floral-bloom anim-${deco.anim ?? "float"}`}
+          className={`floral-bloom floral-${deco.zone} anim-${deco.anim ?? "float"}`}
           style={{
             ...deco.style,
             fontSize: deco.size,
