@@ -1,412 +1,396 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bear, BEAR_KINDS, BEAR_LABELS, type BearKind } from "@/components/bears";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bear, BEAR_KINDS, BEAR_LABELS, BEAR_WEIGHT, type BearKind } from "@/components/bears";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
   ChevronLeft,
   ChevronRight,
-  Sparkles,
   Trophy,
   Trash2,
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  PHYSICS_CONSTANTS,
+  clawWorldX,
+  createInitialPile,
+  step,
+  type Body,
+  type Claw,
+  type World,
+} from "@/lib/claw-physics";
 
-type Plushie = {
-  id: string;
-  kind: BearKind;
-  x: number; // % from left of machine
-  y: number; // % from top of pile area
-  size: number;
-  rotation: number;
-};
+/* ─────────────────────────────────────────────────────────────────────
+ * MemoBear — evita re-render do SVG complexo a cada frame
+ * ────────────────────────────────────────────────────────────────────── */
 
-type Phase = "idle" | "descending" | "grabbing" | "ascending" | "delivering";
+const MemoBear = memo(function MemoBear({ kind }: { kind: BearKind }) {
+  return <Bear kind={kind} className="w-full h-full pointer-events-none" />;
+});
 
-const STORAGE_COLLECTION = "diarinho.bear-collection";
-const STORAGE_STATS = "diarinho.bear-stats";
-const STORAGE_PLUSHIES = "diarinho.bear-plushies";
+/* ─────────────────────────────────────────────────────────────────────
+ * Storage keys
+ * ────────────────────────────────────────────────────────────────────── */
 
-function randomPlushies(count: number): Plushie[] {
-  const out: Plushie[] = [];
-  for (let i = 0; i < count; i++) {
-    out.push({
-      id: `p${i}-${Math.random().toString(36).slice(2, 7)}`,
-      kind: BEAR_KINDS[Math.floor(Math.random() * BEAR_KINDS.length)],
-      x: 8 + Math.random() * 84,
-      y: 38 + Math.random() * 58,
-      size: 50 + Math.random() * 18,
-      rotation: -20 + Math.random() * 40,
-    });
-  }
-  return out;
-}
+const STORAGE_COLLECTION = "diarinho.bear-collection-v2";
+const STORAGE_STATS = "diarinho.bear-stats-v2";
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Component
+ * ────────────────────────────────────────────────────────────────────── */
 
 export function ClawMachine() {
-  // Posição da garra como % horizontal da máquina (0-100)
-  const [clawX, setClawX] = useState(50);
-  // Y como % vertical (0 = topo, 100 = fundo)
-  const [clawY, setClawY] = useState(8);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [holding, setHolding] = useState<BearKind | null>(null);
-  const [plushies, setPlushies] = useState<Plushie[]>([]);
+  const [mounted, setMounted] = useState(false);
+  // World state mantida em refs pra evitar re-renders excessivos
+  const worldRef = useRef<World>({
+    bodies: createInitialPile(14),
+    claw: {
+      targetX: 50,
+      currentX: 50,
+      swingAngle: 0,
+      swingVel: 0,
+      y: PHYSICS_CONSTANTS.ceiling,
+      state: "idle",
+      gripping: null,
+      gripStrength: PHYSICS_CONSTANTS.baseGripStrength,
+    },
+  });
+  // Tick state apenas pra forçar re-render
+  const [, setFrame] = useState(0);
+
   const [collection, setCollection] = useState<BearKind[]>([]);
   const [stats, setStats] = useState({ attempts: 0, wins: 0 });
-  const [mounted, setMounted] = useState(false);
-  const clawTimerRef = useRef<number | null>(null);
+  const [gripBoost, setGripBoost] = useState(false); // bouns mode
 
-  // Load saved state
+  // ── Load saved ───
   useEffect(() => {
     try {
       const c = localStorage.getItem(STORAGE_COLLECTION);
       const s = localStorage.getItem(STORAGE_STATS);
-      const p = localStorage.getItem(STORAGE_PLUSHIES);
       if (c) setCollection(JSON.parse(c));
       if (s) setStats(JSON.parse(s));
-      if (p) {
-        const parsed = JSON.parse(p) as Plushie[];
-        setPlushies(parsed.length > 0 ? parsed : randomPlushies(14));
-      } else {
-        setPlushies(randomPlushies(14));
-      }
-    } catch {
-      setPlushies(randomPlushies(14));
-    }
+    } catch { /* ignore */ }
     setMounted(true);
   }, []);
 
-  // Persist
+  // ── Persist ──
   useEffect(() => {
     if (!mounted) return;
-    localStorage.setItem(STORAGE_COLLECTION, JSON.stringify(collection));
+    try {
+      localStorage.setItem(STORAGE_COLLECTION, JSON.stringify(collection));
+    } catch { /* ignore */ }
   }, [collection, mounted]);
   useEffect(() => {
     if (!mounted) return;
-    localStorage.setItem(STORAGE_STATS, JSON.stringify(stats));
+    try {
+      localStorage.setItem(STORAGE_STATS, JSON.stringify(stats));
+    } catch { /* ignore */ }
   }, [stats, mounted]);
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem(STORAGE_PLUSHIES, JSON.stringify(plushies));
-  }, [plushies, mounted]);
 
-  // Cleanup timers
+  // ── World callbacks ──
   useEffect(() => {
-    return () => {
-      if (clawTimerRef.current) window.clearTimeout(clawTimerRef.current);
+    const w = worldRef.current;
+    w.onDelivered = (b: Body) => {
+      setCollection((c) => [...c, b.kind]);
+      setStats((s) => ({ ...s, wins: s.wins + 1 }));
+      // remove from pile
+      w.bodies = w.bodies.filter((x) => x.id !== b.id);
+      toast.success(`Pegou um ${BEAR_LABELS[b.kind]}!`, {
+        description: `Peso: ${b.mass}g · Força da garra: ${w.claw.gripStrength}g`,
+      });
+    };
+    w.onMissed = (reason) => {
+      if (reason === "slipped") {
+        toast(`Escorregou! 😅`, {
+          description: "Peso ou balanço foi demais pra garra",
+        });
+      } else if (reason === "no-target") {
+        toast("Errou a mira 🎯");
+      }
     };
   }, []);
 
-  const moveLeft = useCallback(() => {
-    if (phase !== "idle") return;
-    setClawX((x) => Math.max(6, x - 6));
-  }, [phase]);
-  const moveRight = useCallback(() => {
-    if (phase !== "idle") return;
-    setClawX((x) => Math.min(94, x + 6));
-  }, [phase]);
+  // ── Physics loop ──
+  useEffect(() => {
+    if (!mounted) return;
+    let raf = 0;
+    let last = performance.now();
+    function loop(t: number) {
+      const dt = (t - last) / 1000;
+      last = t;
+      step(worldRef.current, dt);
+      setFrame((f) => (f + 1) % 1000000);
+      raf = requestAnimationFrame(loop);
+    }
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [mounted]);
 
+  // ── Controls ──
+  const w = worldRef.current;
+  const canControl = w.claw.state === "idle";
+
+  const moveLeft = useCallback(() => {
+    if (worldRef.current.claw.state !== "idle") return;
+    worldRef.current.claw.targetX = Math.max(8, worldRef.current.claw.targetX - 6);
+  }, []);
+  const moveRight = useCallback(() => {
+    if (worldRef.current.claw.state !== "idle") return;
+    worldRef.current.claw.targetX = Math.min(92, worldRef.current.claw.targetX + 6);
+  }, []);
   const drop = useCallback(() => {
-    if (phase !== "idle") return;
-    if (plushies.length === 0) {
-      toast("Máquina vazia — recarregue 🥺");
+    if (worldRef.current.claw.state !== "idle") return;
+    if (worldRef.current.bodies.length === 0) {
+      toast("Máquina vazia 🥺 recarregue!");
       return;
     }
-    setPhase("descending");
+    worldRef.current.claw.state = "descending";
     setStats((s) => ({ ...s, attempts: s.attempts + 1 }));
-
-    // animar descida
-    setClawY(78);
-
-    clawTimerRef.current = window.setTimeout(() => {
-      // checa colisão: ursinho mais próximo horizontalmente E na faixa do fundo
-      const candidates = plushies
-        .map((p) => ({
-          plushie: p,
-          dist: Math.abs(p.x - clawX),
-        }))
-        .filter((c) => c.dist < 10)
-        .sort((a, b) => a.dist - b.dist);
-
-      const target = candidates[0]?.plushie;
-      // chance baseada em proximidade: mais perto = mais provável
-      const baseChance = target ? Math.max(0.35, 0.85 - candidates[0].dist * 0.04) : 0;
-      const success = target && Math.random() < baseChance;
-
-      setPhase("grabbing");
-      clawTimerRef.current = window.setTimeout(() => {
-        if (success && target) {
-          setHolding(target.kind);
-          setPlushies((ps) => ps.filter((p) => p.id !== target.id));
-        }
-        setPhase("ascending");
-        setClawY(8);
-
-        clawTimerRef.current = window.setTimeout(() => {
-          if (success && target) {
-            setPhase("delivering");
-            // mover pro slot do prêmio (esquerda)
-            setClawX(8);
-            clawTimerRef.current = window.setTimeout(() => {
-              setCollection((c) => [...c, target.kind]);
-              setStats((s) => ({ ...s, wins: s.wins + 1 }));
-              setHolding(null);
-              toast.success(`Pegou um ${BEAR_LABELS[target.kind]}! 🎉`);
-              setPhase("idle");
-            }, 1100);
-          } else {
-            setPhase("idle");
-            if (target) {
-              toast("Quase! O ursinho escorregou 😅");
-            } else {
-              toast("Errou a mira 🎯 tenta de novo");
-            }
-          }
-        }, 900);
-      }, 600);
-    }, 1400);
-  }, [phase, plushies, clawX]);
+    // schedule transition descending → ascending after closing pause
+    const checkClose = () => {
+      const c = worldRef.current.claw;
+      if (c.state === "closing") {
+        window.setTimeout(() => {
+          worldRef.current.claw.state = "ascending";
+        }, 450);
+      } else if (c.state !== "idle") {
+        window.setTimeout(checkClose, 50);
+      }
+    };
+    window.setTimeout(checkClose, 50);
+  }, []);
 
   const refill = useCallback(() => {
-    setPlushies(randomPlushies(14));
+    if (worldRef.current.claw.state !== "idle") return;
+    worldRef.current.bodies = createInitialPile(14);
     toast.success("Máquina recheada de novo! 🧸");
   }, []);
 
   const resetCollection = useCallback(() => {
-    if (!confirm("Apagar sua coleção de ursinhos?")) return;
+    if (!confirm("Apagar toda sua coleção e estatísticas?")) return;
     setCollection([]);
     setStats({ attempts: 0, wins: 0 });
-    toast("Coleção resetada");
+    toast("Tudo resetado");
   }, []);
 
-  // Keyboard controls
+  const toggleGripBoost = useCallback(() => {
+    setGripBoost((v) => {
+      const next = !v;
+      worldRef.current.claw.gripStrength = next ? 140 : PHYSICS_CONSTANTS.baseGripStrength;
+      toast(next ? "Garra reforçada ativada 💪" : "Garra normal");
+      return next;
+    });
+  }, []);
+
+  // Keyboard
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft") moveLeft();
-      if (e.key === "ArrowRight") moveRight();
-      if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        drop();
-      }
+      if (e.key === "ArrowLeft") { e.preventDefault(); moveLeft(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); moveRight(); }
+      else if (e.key === " " || e.key === "Enter") { e.preventDefault(); drop(); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [moveLeft, moveRight, drop]);
 
-  // Group collection by kind for the trophy bar
+  // Coleção agrupada
   const collectionCount = useMemo(() => {
     const c: Record<BearKind, number> = {
-      pink: 0, lilac: 0, mint: 0, yellow: 0, blue: 0, peach: 0,
+      honey: 0, cream: 0, rose: 0, lavender: 0, sage: 0, skyblue: 0,
     };
     for (const k of collection) c[k]++;
     return c;
   }, [collection]);
-
   const winRate = stats.attempts > 0
     ? Math.round((stats.wins / stats.attempts) * 100)
     : 0;
 
   return (
     <div className="grid lg:grid-cols-[1fr,300px] gap-6 items-start">
-      {/* === Machine === */}
+      {/* === MACHINE === */}
       <Card className="p-3 md:p-5 relative overflow-hidden">
         <header className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🧸</span>
             <h2 className="font-handwriting text-3xl text-[var(--primary)] leading-none">
-              Máquina de Ursinhos
+              Pegapelúcia
             </h2>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refill}
-            disabled={phase !== "idle"}
-            title="Recarregar ursinhos"
-          >
+          <Button variant="ghost" size="sm" onClick={refill} disabled={!canControl} title="Recarregar">
             <RotateCcw className="h-4 w-4" />
           </Button>
         </header>
 
-        {/* The machine itself */}
+        {/* MACHINE BODY */}
         <div
-          className="relative aspect-[4/5] sm:aspect-[5/5] rounded-3xl overflow-hidden border-4 border-[#a85274] shadow-inner select-none"
+          className="relative aspect-[5/6] rounded-3xl overflow-hidden select-none"
           style={{
             background:
-              "linear-gradient(180deg, #ffe4ee 0%, #ffd4e0 25%, #ffc1d5 65%, #ffb3cf 100%)",
+              "linear-gradient(180deg, #d93953 0%, #b51a3c 18%, #8a0a2c 100%)",
+            boxShadow:
+              "inset 0 4px 0 rgba(255,255,255,0.18), inset 0 -8px 14px rgba(0,0,0,0.4)",
           }}
         >
-          {/* Top bar (rail) */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[10%] flex items-center justify-center text-white font-bold text-sm md:text-base tracking-widest uppercase"
-            style={{
-              background:
-                "linear-gradient(180deg, #d83c6d 0%, #b81a4c 100%)",
-              borderBottom: "3px solid #841232",
-            }}
-          >
-            <span className="drop-shadow">⚙ {phase === "idle" ? "Prontinho" : "Trabalhando..."} ⚙</span>
-          </div>
-
-          {/* Glass reflection */}
-          <div
-            aria-hidden
-            className="absolute inset-x-0 top-[10%] bottom-[12%] pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.08) 100%)",
-            }}
-          />
-
-          {/* Plushies pile */}
-          <div className="absolute inset-x-0 top-[12%] bottom-[12%]">
-            {mounted && plushies.map((p) => (
-              <div
-                key={p.id}
-                className="absolute"
-                style={{
-                  left: `${p.x}%`,
-                  top: `${p.y}%`,
-                  width: `${p.size}px`,
-                  height: `${p.size}px`,
-                  transform: `translate(-50%, -50%) rotate(${p.rotation}deg)`,
-                  filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.15))",
-                }}
-              >
-                <Bear kind={p.kind} className="w-full h-full" />
-              </div>
-            ))}
-          </div>
-
-          {/* Claw rail */}
-          <div
-            className="absolute top-[10%] left-0 right-0 h-0.5 bg-[#841232]/40"
-            aria-hidden
-          />
-
-          {/* Claw */}
-          <div
-            className={cn(
-              "absolute top-[10%] flex flex-col items-center",
-              phase === "ascending" ? "transition-all duration-1100" :
-              phase === "descending" ? "transition-all duration-1400" :
-              phase === "delivering" ? "transition-all duration-1100" :
-              "transition-all duration-300",
-            )}
-            style={{
-              left: `${clawX}%`,
-              transform: `translate(-50%, ${clawY * 0.9}%)`,
-            }}
-          >
-            {/* Cable */}
+          {/* HEADER PANEL (LED display) */}
+          <div className="absolute inset-x-0 top-0 h-[8%] flex items-center justify-center">
             <div
-              className="w-0.5 bg-[#841232]"
-              style={{ height: `${clawY * 0.9 + 8}px` }}
-            />
-            {/* Claw head */}
-            <div className="relative">
-              <svg width="56" height="56" viewBox="0 0 64 64" aria-hidden>
-                <defs>
-                  <linearGradient id="claw-g" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ffd6e3" />
-                    <stop offset="60%" stopColor="#c9c9d4" />
-                    <stop offset="100%" stopColor="#7a7a8a" />
-                  </linearGradient>
-                </defs>
-                {/* base */}
-                <rect x="22" y="6" width="20" height="14" rx="3" fill="url(#claw-g)" stroke="#4a4a55" strokeWidth="1.5" />
-                {/* spring */}
-                <line x1="32" y1="20" x2="32" y2="28" stroke="#4a4a55" strokeWidth="2" />
-                {/* claws */}
-                <g stroke="#4a4a55" strokeWidth="2" fill="url(#claw-g)">
-                  {phase === "grabbing" || phase === "ascending" || phase === "delivering" ? (
-                    /* closed */
-                    <>
-                      <path d="M32 28 L24 50 L34 50 Z" />
-                      <path d="M32 28 L40 50 L30 50 Z" />
-                    </>
-                  ) : (
-                    /* open */
-                    <>
-                      <path d="M32 28 L16 52 L26 50 Z" />
-                      <path d="M32 28 L48 52 L38 50 Z" />
-                    </>
-                  )}
-                </g>
-              </svg>
-              {/* Held bear */}
-              {holding && (phase === "ascending" || phase === "delivering") && (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 top-[60%]"
-                  style={{ width: 56, height: 56 }}
-                >
-                  <Bear kind={holding} className="w-full h-full" />
-                </div>
-              )}
+              className="px-4 py-1 rounded-md font-mono text-xs tracking-widest"
+              style={{
+                background: "#1a0810",
+                color: "#ffd54f",
+                textShadow: "0 0 8px #ffd54f, 0 0 14px rgba(255, 213, 79, 0.5)",
+                border: "2px solid #5a1020",
+                boxShadow: "inset 0 0 12px rgba(255, 213, 79, 0.2)",
+              }}
+            >
+              ★ PEGAPELÚCIA ★ {String(collection.length).padStart(3, "0")}
             </div>
           </div>
 
-          {/* Prize slot (left side) */}
+          {/* GLASS BOX */}
           <div
-            className="absolute left-0 bottom-0 w-[18%] h-[20%] flex items-end justify-center"
+            className="absolute inset-x-[5%] top-[10%] bottom-[20%] rounded-2xl overflow-hidden"
             style={{
               background:
-                "linear-gradient(180deg, transparent 0%, rgba(135, 0, 50, 0.25) 60%, rgba(135, 0, 50, 0.5) 100%)",
-              borderRight: "3px solid #841232",
+                "linear-gradient(180deg, rgba(255,235,245,0.45) 0%, rgba(255,200,220,0.35) 50%, rgba(255,180,200,0.4) 100%)",
+              border: "3px solid #5a0a2c",
+              boxShadow:
+                "inset 0 0 24px rgba(0,0,0,0.15), inset 0 6px 12px rgba(255,255,255,0.4)",
             }}
           >
-            <span className="text-xs text-white font-bold pb-1 drop-shadow">PRÊMIO</span>
+            {/* glass reflection */}
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "linear-gradient(125deg, rgba(255,255,255,0.4) 0%, transparent 20%, transparent 80%, rgba(255,255,255,0.15) 100%)",
+              }}
+            />
+
+            {/* CLAW + BEARS render area — uses % coords */}
+            <PlayField worldRef={worldRef} />
           </div>
 
-          {/* Floor */}
+          {/* CONTROL PANEL */}
           <div
-            className="absolute inset-x-0 bottom-0 h-[12%]"
+            className="absolute inset-x-0 bottom-0 h-[20%] flex items-center justify-around px-4"
             style={{
-              background:
-                "linear-gradient(180deg, #c4356b 0%, #841232 100%)",
-              borderTop: "3px solid #841232",
+              background: "linear-gradient(180deg, #b51a3c 0%, #6a0820 100%)",
+              borderTop: "3px solid #ffd54f",
+              boxShadow: "inset 0 4px 8px rgba(255,255,255,0.15)",
             }}
-          />
+          >
+            {/* Coin slot (decorative) */}
+            <div
+              aria-hidden
+              className="hidden sm:flex flex-col items-center gap-1"
+            >
+              <div className="h-2 w-10 rounded-sm bg-black/60" />
+              <div className="text-[8px] text-white/60 font-mono">COIN</div>
+            </div>
+
+            {/* Joystick (visual) */}
+            <div className="relative h-14 w-14 hidden sm:block">
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(circle at 30% 30%, #4a4a55 0%, #2a2a35 60%, #1a1a20 100%)",
+                  boxShadow: "inset 0 -3px 6px rgba(0,0,0,0.6)",
+                }}
+              />
+              <div
+                className="absolute left-1/2 top-1/2 h-8 w-3 rounded-full"
+                style={{
+                  background: "linear-gradient(180deg, #ffd6e3 0%, #c7c7d2 100%)",
+                  transform: `translate(-50%, -100%) rotate(${(w.claw.targetX - 50) * 0.4}deg)`,
+                  transformOrigin: "bottom",
+                  transition: "transform 0.2s",
+                }}
+              />
+              <div
+                className="absolute left-1/2 top-0 h-5 w-5 rounded-full"
+                style={{
+                  background: "radial-gradient(circle, #ff6b8a 0%, #b81a3c 100%)",
+                  transform: `translate(-50%, -50%)`,
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+                }}
+              />
+            </div>
+
+            {/* Big DROP button */}
+            <button
+              type="button"
+              onClick={drop}
+              disabled={!canControl}
+              className="relative h-14 w-14 rounded-full transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              style={{
+                background: !canControl
+                  ? "radial-gradient(circle at 30% 30%, #4a4a55 0%, #2a2a35 100%)"
+                  : "radial-gradient(circle at 30% 30%, #ffd54f 0%, #e0a040 60%, #a06820 100%)",
+                boxShadow: !canControl
+                  ? "inset 0 -3px 6px rgba(0,0,0,0.5)"
+                  : "0 4px 0 #6a4815, 0 6px 12px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.5)",
+              }}
+              aria-label="Soltar a garra"
+              title="Soltar a garra (espaço/enter)"
+            >
+              <span className="absolute inset-0 flex items-center justify-center font-bold text-[10px] text-[#3a2010] uppercase tracking-wider">
+                DROP
+              </span>
+            </button>
+
+            {/* Strength indicator */}
+            <div className="hidden sm:flex flex-col items-center gap-1 text-white/80">
+              <span className="text-[8px] uppercase tracking-wider">grip</span>
+              <span className="text-xs font-mono font-bold">
+                {w.claw.gripStrength}g
+              </span>
+            </div>
+          </div>
+
+          {/* CORNER BOLTS */}
+          {[
+            { top: "4%", left: "3%" },
+            { top: "4%", right: "3%" },
+            { bottom: "4%", left: "3%" },
+            { bottom: "4%", right: "3%" },
+          ].map((pos, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="absolute h-2.5 w-2.5 rounded-full"
+              style={{
+                ...pos,
+                background:
+                  "radial-gradient(circle at 30% 30%, #ffd6e3 0%, #888 70%, #444 100%)",
+              }}
+            />
+          ))}
         </div>
 
-        {/* Controls */}
+        {/* External controls (touch friendly + secondary) */}
         <div className="mt-4 flex items-center justify-center gap-3 flex-wrap">
-          <Button
-            size="lg"
-            variant="soft"
-            onClick={moveLeft}
-            disabled={phase !== "idle"}
-            aria-label="Mover esquerda"
-          >
-            <ChevronLeft className="h-5 w-5" />
+          <Button size="lg" variant="soft" onClick={moveLeft} disabled={!canControl}>
+            <ChevronLeft className="h-5 w-5" /> Esquerda
           </Button>
-          <Button
-            size="lg"
-            onClick={drop}
-            disabled={phase !== "idle"}
-            className="min-w-[160px]"
-          >
-            <Sparkles className="h-4 w-4" />
-            {phase === "idle" ? "Soltar a garra!" : "Aguenta..."}
+          <Button size="lg" onClick={drop} disabled={!canControl} className="min-w-[140px]">
+            {canControl ? "Soltar 🎯" : "Indo..."}
           </Button>
-          <Button
-            size="lg"
-            variant="soft"
-            onClick={moveRight}
-            disabled={phase !== "idle"}
-            aria-label="Mover direita"
-          >
-            <ChevronRight className="h-5 w-5" />
+          <Button size="lg" variant="soft" onClick={moveRight} disabled={!canControl}>
+            Direita <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
         <p className="text-center text-xs text-[var(--muted-fg)] mt-2">
-          💡 Use as setas ← → e espaço/enter pra mirar e soltar
+          ⌨️ setas movem, espaço/enter solta
         </p>
       </Card>
 
-      {/* === Collection sidebar === */}
+      {/* === SIDEBAR === */}
       <div className="space-y-4">
         <Card className="p-4">
           <header className="flex items-center justify-between mb-3">
@@ -418,23 +402,24 @@ export function ClawMachine() {
               {collection.length}
             </span>
           </header>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {BEAR_KINDS.map((k) => (
               <div
                 key={k}
                 className={cn(
-                  "flex items-center gap-3 p-2 rounded-2xl transition-all",
-                  collectionCount[k] > 0
-                    ? "bg-[var(--muted)]"
-                    : "opacity-40",
+                  "flex items-center gap-2 p-1.5 rounded-2xl transition-all",
+                  collectionCount[k] > 0 ? "bg-[var(--muted)]" : "opacity-40",
                 )}
               >
-                <div className="w-10 h-10 shrink-0">
+                <div className="w-10 h-11 shrink-0">
                   <Bear kind={k} className="w-full h-full" />
                 </div>
-                <span className="flex-1 text-sm font-semibold">
-                  {BEAR_LABELS[k]}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{BEAR_LABELS[k]}</p>
+                  <p className="text-[10px] text-[var(--muted-fg)]">
+                    {BEAR_WEIGHT[k]}g
+                  </p>
+                </div>
                 <span className="text-sm font-bold text-[var(--primary)]">
                   ×{collectionCount[k]}
                 </span>
@@ -444,36 +429,188 @@ export function ClawMachine() {
         </Card>
 
         <Card className="p-4">
-          <h3 className="font-bold text-base flex items-center gap-2 mb-2">
-            🎯 Estatísticas
-          </h3>
+          <h3 className="font-bold text-base mb-3">🎯 Estatísticas</h3>
           <div className="space-y-1 text-sm">
-            <p>
-              <span className="text-[var(--muted-fg)]">Tentativas:</span>{" "}
-              <strong>{stats.attempts}</strong>
-            </p>
-            <p>
-              <span className="text-[var(--muted-fg)]">Pegou:</span>{" "}
-              <strong>{stats.wins}</strong>
-            </p>
-            <p>
-              <span className="text-[var(--muted-fg)]">Taxa de acerto:</span>{" "}
-              <strong>{winRate}%</strong>
-            </p>
+            <p>Tentativas: <strong>{stats.attempts}</strong></p>
+            <p>Pegou: <strong>{stats.wins}</strong></p>
+            <p>Taxa: <strong>{winRate}%</strong></p>
           </div>
-          {collection.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetCollection}
-              className="mt-3 w-full"
-            >
-              <Trash2 className="h-3 w-3" />
-              Resetar tudo
-            </Button>
-          )}
         </Card>
+
+        <Card className="p-4">
+          <h3 className="font-bold text-base mb-3 flex items-center gap-2">
+            💪 Garra
+          </h3>
+          <p className="text-xs text-[var(--muted-fg)] mb-2 leading-snug">
+            Cada urso tem peso diferente. Quanto mais pesado, mais chance de
+            escapar. Sálvia é a mais pesada (110g), Céu a mais leve (60g).
+          </p>
+          <Button
+            variant={gripBoost ? "accent" : "soft"}
+            size="sm"
+            onClick={toggleGripBoost}
+            className="w-full"
+          >
+            {gripBoost ? "Reforçada 💪 ON" : "Reforçar garra"}
+          </Button>
+          <p className="text-[10px] text-[var(--muted-fg)] mt-2 leading-snug">
+            {gripBoost
+              ? "Aguenta até 140g — pega qualquer urso fácil"
+              : "Padrão: 95g — peso ≥ esse vai escorregar"}
+          </p>
+        </Card>
+
+        {collection.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={resetCollection} className="w-full">
+            <Trash2 className="h-3 w-3" /> Resetar tudo
+          </Button>
+        )}
       </div>
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * PlayField — renderiza apenas o mundo de bodies + garra. Reads worldRef
+ * a cada render do parent (que tikka via setFrame).
+ * ────────────────────────────────────────────────────────────────────── */
+
+function PlayField({ worldRef }: { worldRef: React.RefObject<World> }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const w = worldRef.current;
+  if (!w) return null;
+  const { bodies, claw } = w;
+  const tipX = clawWorldX(claw);
+
+  return (
+    <div ref={containerRef} className="absolute inset-0">
+      {/* PRIZE CHUTE — slot na esquerda inferior */}
+      <div
+        aria-hidden
+        className="absolute"
+        style={{
+          left: "0%",
+          top: "75%",
+          width: "16%",
+          height: "25%",
+          background:
+            "linear-gradient(180deg, transparent 0%, rgba(90, 10, 44, 0.25) 60%, rgba(90, 10, 44, 0.45) 100%)",
+          borderRight: "2px dashed rgba(90, 10, 44, 0.4)",
+        }}
+      >
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-bold text-[#5a0a2c] tracking-widest">
+          PRÊMIO
+        </div>
+      </div>
+
+      {/* RAIL on top */}
+      <div
+        aria-hidden
+        className="absolute left-0 right-0 h-[2px]"
+        style={{
+          top: `${PHYSICS_CONSTANTS.ceiling}%`,
+          background: "#5a0a2c",
+          boxShadow: "0 1px 0 rgba(255,255,255,0.4)",
+        }}
+      />
+
+      {/* CABLE */}
+      <div
+        aria-hidden
+        className="absolute"
+        style={{
+          left: `${claw.currentX}%`,
+          top: `${PHYSICS_CONSTANTS.ceiling}%`,
+          width: "2px",
+          height: `${claw.y - PHYSICS_CONSTANTS.ceiling}%`,
+          background: "#3a0a20",
+          transform: `translateX(-1px) rotate(${claw.swingAngle}rad)`,
+          transformOrigin: "top center",
+        }}
+      />
+
+      {/* BODIES */}
+      {bodies.map((b) => (
+        <div
+          key={b.id}
+          className="absolute"
+          style={{
+            left: `${b.x}%`,
+            top: `${b.y}%`,
+            width: `${b.r * 2.6}%`,
+            transform: `translate(-50%, -50%) rotate(${b.angle}rad)`,
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.25))",
+          }}
+        >
+          <MemoBear kind={b.kind} />
+        </div>
+      ))}
+
+      {/* CLAW HEAD */}
+      <div
+        aria-hidden
+        className="absolute"
+        style={{
+          left: `${tipX}%`,
+          top: `${claw.y}%`,
+          transform: `translate(-50%, -50%) rotate(${claw.swingAngle}rad)`,
+          width: "11%",
+          height: "11%",
+        }}
+      >
+        <ClawHead phase={claw.state} />
+      </div>
+
+      {/* FLOOR */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 bottom-0"
+        style={{
+          height: `${100 - PHYSICS_CONSTANTS.floor}%`,
+          background:
+            "linear-gradient(180deg, rgba(90,10,44,0.5) 0%, #5a0a2c 100%)",
+          borderTop: "2px solid #ffd54f",
+        }}
+      />
+    </div>
+  );
+}
+
+function ClawHead({ phase }: { phase: Claw["state"] }) {
+  const closed = phase === "closing" || phase === "ascending" || phase === "delivering";
+  return (
+    <svg viewBox="0 0 80 80" className="w-full h-full">
+      <defs>
+        <linearGradient id="claw-base" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffd6e3" />
+          <stop offset="60%" stopColor="#c9c9d4" />
+          <stop offset="100%" stopColor="#6a6a7a" />
+        </linearGradient>
+        <radialGradient id="claw-bolt" cx="30%" cy="30%" r="60%">
+          <stop offset="0%" stopColor="#fff" />
+          <stop offset="100%" stopColor="#888" />
+        </radialGradient>
+      </defs>
+      {/* base / motor */}
+      <rect x="22" y="2" width="36" height="22" rx="4" fill="url(#claw-base)" stroke="#3a3a45" strokeWidth="1.5" />
+      <circle cx="28" cy="13" r="2.5" fill="url(#claw-bolt)" />
+      <circle cx="52" cy="13" r="2.5" fill="url(#claw-bolt)" />
+      {/* connector */}
+      <rect x="36" y="22" width="8" height="6" fill="#3a3a45" />
+      {/* claws */}
+      <g stroke="#2a2a35" strokeWidth="2" strokeLinejoin="round">
+        {closed ? (
+          <>
+            <path d="M40 28 L30 60 L42 60 Z" fill="url(#claw-base)" />
+            <path d="M40 28 L50 60 L38 60 Z" fill="url(#claw-base)" />
+          </>
+        ) : (
+          <>
+            <path d="M40 28 L18 62 L32 58 Z" fill="url(#claw-base)" />
+            <path d="M40 28 L62 62 L48 58 Z" fill="url(#claw-base)" />
+          </>
+        )}
+      </g>
+    </svg>
   );
 }
